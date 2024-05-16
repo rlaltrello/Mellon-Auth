@@ -5,7 +5,7 @@ This is a -very- rough draft.
 Configure mod_auth_mellon on your apache setup (outside of this scope).
 
 For your virtual host add:
-
+```
 <Location /wp-admin>
     # Mellon auth
     Include /etc/httpd/mellon/yourconfigfile.cnf
@@ -15,6 +15,7 @@ For your virtual host add:
     # Mellon auth 
     Include /etc/httpd/mellon/yourconfigfile.cnf
 </Location>
+```
 
 That will force mod_auth_mellon to authenticate with your IDP and return your claims back to you in $SERVER['MELLON_xxxxxxxx'] variables when you visit those URLs. Note: you can change this 'MELLON_' prefix mod_auth_mellon config, but this is the default.
 
