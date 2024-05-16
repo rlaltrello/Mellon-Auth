@@ -1,7 +1,7 @@
 <?
 /*
 Plugin Name:  Mellon-Auth
-Plugin URI:   https://www.highlands.edu
+Plugin URI:   https://www.laltrello.com
 Description:  A plugin to utilize mod_auth_mellon for WordPress authentication
 Version:      1.0.1
 Author:       Rob Laltrello
