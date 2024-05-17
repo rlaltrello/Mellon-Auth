@@ -1,17 +1,14 @@
 <?php
-class MellonAuthSettingsPage
-{
+class MellonAuthSettingsPage {
      // Holds the values to be used in the fields callbacks
     private $options;
 
-    public function __construct()
-    {
+    public function __construct() {
         add_action( 'admin_menu', array( $this, 'add_plugin_page' ) );
         add_action( 'admin_init', array( $this, 'page_init' ) );
     }
 
-    public function add_plugin_page()
-    {
+    public function add_plugin_page() {
         // This page will be under "Settings"
         add_options_page(
             'Mellon-Auth Settings Admin', 
@@ -22,8 +19,7 @@ class MellonAuthSettingsPage
         );
     }
 
-    public function create_admin_page()
-    {
+    public function create_admin_page() {
         // Set class property
         $this->options = get_option( 'mellon_auth_option_name' );
         ?>
@@ -43,8 +39,7 @@ class MellonAuthSettingsPage
         <?php
     }
 
-    public function page_init()
-    {        
+    public function page_init() {        
         register_setting(
             'mellon_auth_option_group', // Option group
             'mellon_auth_option_name', // Option name
@@ -85,8 +80,7 @@ class MellonAuthSettingsPage
      // Sanitize each setting field as needed
      //
      // @param array $input Contains all settings fields as array keys
-    public function sanitize( $input )
-    {
+    public function sanitize( $input ) {
         $new_input = array();
         if( isset( $input['create_new_user'] ) )
             $new_input['create_new_user'] = $input['create_new_user'];
@@ -97,8 +91,7 @@ class MellonAuthSettingsPage
         return $new_input;
     }
 
-    public function print_mellon_info()
-    {
+    public function print_mellon_info() {
 		print "<div style='border-top: 2px solid black;padding-bottom:20px;'><b>Mellon Variables:</b></div>";
 		//spit out the MELLON variable for fun and profit!
 		foreach($_SERVER as $key=>$value) {
@@ -110,18 +103,15 @@ class MellonAuthSettingsPage
 
     }
 
-    public function print_section_info()
-    {
+    public function print_section_info() {
         print 'Only authenicated users with an email address domain listed in the \'Allowed Domain Names\' list below will be allowed into the site. (e.g highlands.edu)';
     }
 
-    public function create_new_user_callback()
-    {
+    public function create_new_user_callback() {
         echo '<input type="checkbox" id="create_new_user" name="mellon_auth_option_name[create_new_user]" value="1"' . checked( 1, @$this->options['create_new_user'],false ). '/>';
     }
 
-    public function domain_names_callback()
-    {
+    public function domain_names_callback() {
         printf(
             '<input type="text" id="domain_names" name="mellon_auth_option_name[domain_names]" value="%s" />',
             isset( $this->options['domain_names'] ) ? esc_attr( $this->options['domain_names']) : ''
