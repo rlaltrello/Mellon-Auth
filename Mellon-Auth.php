@@ -63,6 +63,24 @@ class MellonAuth
                         'role' => 'subscriber'
                     )
                 );
+
+                if ( is_multisite() ) {  // if it is a multisite, add them to the sites as subscriber
+                    $sites = get_sites( [
+                        'limit' => 0,
+                        'public' => true,
+                        'spam' => false,
+                        'deleted' => false,
+                        'archived' => false,
+                        'mature' => false,
+                     ] );
+                
+                     foreach ( $sites as $site ) {
+                         $site_id = get_object_vars( $site )['blog_id'];
+                         $add_user = add_user_to_blog( $site_id, $user_id, 'subscriber' );
+                     }
+                
+                }
+
                 $user = get_user_by('id', $user_id);
             }
 
