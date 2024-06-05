@@ -31,7 +31,7 @@ class MellonAuth
         $createuser = $mellon_auth_options['create_new_user'] ?? null; // checkbox makes this variable "disappear" 
         // so handle it with fancy null coalescing operator
 
-        $alloweddomains = $mellon_auth_options['domain_names'];  // comma separated list of allowed domain names
+        $alloweddomains = $mellon_auth_options['domain_names'] ?? null;  // comma separated list of allowed domain names
 
         $domainarray = explode(',', $alloweddomains);  // split them into array
 
