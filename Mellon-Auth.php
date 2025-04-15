@@ -3,7 +3,7 @@
 Plugin Name:  Mellon-Auth
 Plugin URI:   https://www.laltrello.com
 Description:  A plugin to utilize mod_auth_mellon for WordPress authentication
-Version:      1.0.1
+Version:      1.0.2
 Author:       Rob Laltrello
 Author URI:   https://www.laltrello.com/
 License:      GPL2
@@ -32,6 +32,7 @@ class MellonAuth
         // so handle it with fancy null coalescing operator
 
         $alloweddomains = $mellon_auth_options['domain_names'] ?? null;  // comma separated list of allowed domain names
+	$redirectlocation = $mellon_auth_options['redirect_location'] ?? null; //where to land the authenticated user
 
         $domainarray = explode(',', $alloweddomains);  // split them into array
 
@@ -84,6 +85,12 @@ class MellonAuth
                 $user = get_user_by('id', $user_id);
             }
 
+	    if ($redirectlocation === "admin") {
+                  $redirect_to= user_admin_url();
+	    } else { //default
+		  $redirect_to=site_url();
+	    }
+
             if (!is_wp_error($user) && $user && $alloweddomaincheck) { // user exist and domain is allowed
 
                 //log them into wp
@@ -95,7 +102,6 @@ class MellonAuth
                 // check to make sure they are logged in
                 if (is_user_logged_in()) {
                     //user is logged in, send them to the appropriate admin page
-                    $redirect_to = user_admin_url();
                     wp_safe_redirect($redirect_to);
                     exit;
                 }
