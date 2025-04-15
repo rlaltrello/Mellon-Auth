@@ -80,6 +80,14 @@ class MellonAuthSettingsPage
             'mellon-auth-setting-admin', // Page
             'setting_section_id' // Section
         );
+
+        add_settings_field(
+            'redirect_location', //ID
+            'Redirect to:', // Name 
+            array($this, 'redirect_location_callback'), // Callback
+            'mellon-auth-setting-admin', // Page
+            'setting_section_id', // Section
+        );
     }
 
     // Sanitize each setting field as needed
@@ -93,6 +101,9 @@ class MellonAuthSettingsPage
 
         if (isset($input['domain_names']))
             $new_input['domain_names'] = sanitize_text_field($input['domain_names']);
+
+        if (isset($input['redirect_location']))
+            $new_input['redirect_location'] = $input['redirect_location'];
 
         return $new_input;
     }
@@ -127,6 +138,14 @@ class MellonAuthSettingsPage
             isset($this->options['domain_names']) ? esc_attr($this->options['domain_names']) : ''
         );
     }
+
+    public function redirect_location_callback()
+    {
+	    echo '<input type="radio" id="redirect_location" name="mellon_auth_option_name[redirect_location]" value="site"' . checked("site", @$this->options['redirect_location'], false) . '/><label for="site">Site URL</label><br/>';
+	    echo '<input type="radio" id="redirect_location" name="mellon_auth_option_name[redirect_location]" value="admin"' . checked("admin", @$this->options['redirect_location'], false) . '/><label for="admin">User Admin URL</label>';
+
+    }
+
 }
 
 if (is_admin())
