@@ -1,18 +1,14 @@
 <?php
-class MellonAuthSettingsPage
-{
-    // Holds the values to be used in the fields callbacks
+
+class MellonAuthSettingsPage {
     private $options;
 
-    public function __construct()
-    {
+    public function __construct() {
         add_action('admin_menu', array($this, 'add_plugin_page'));
         add_action('admin_init', array($this, 'page_init'));
     }
 
-    public function add_plugin_page()
-    {
-        // This page will be under "Settings"
+    public function add_plugin_page() {
         add_options_page(
             'Mellon-Auth Settings Admin',
             'Mellon-Auth Settings',
@@ -22,132 +18,78 @@ class MellonAuthSettingsPage
         );
     }
 
-    public function create_admin_page()
-    {
-        // Set class property
+    public function create_admin_page() {
         $this->options = get_option('mellon_auth_option_name');
         ?>
         <div class="wrap">
             <h1>Mellon-Auth Settings</h1>
             <form method="post" action="options.php">
                 <?php
-                // This prints out all hidden setting fields
                 settings_fields('mellon_auth_option_group');
                 do_settings_sections('mellon-auth-setting-admin');
                 submit_button();
-
-
                 ?>
             </form>
         </div>
         <?php
     }
 
-    public function page_init()
-    {
+    public function page_init() {
         register_setting(
-            'mellon_auth_option_group', // Option group
-            'mellon_auth_option_name', // Option name
-            array($this, 'sanitize') // Sanitize
+            'mellon_auth_option_group',
+            'mellon_auth_option_name',
+            array($this, 'sanitize')
         );
 
-        add_settings_section(
-            'setting_section_id', // ID
-            'Single Sign-on Authentication Settings', // Name
-            array($this, 'print_section_info'), // Callback
-            'mellon-auth-setting-admin' // Page
-        );
+        add_settings_section('setting_section_id', 'SSO Settings', array($this, 'print_section_info'), 'mellon-auth-setting-admin');
+        add_settings_section('mellon_section_id', 'Mellon Debug Information', array($this, 'print_mellon_info'), 'mellon-auth-setting-admin');
 
-        add_settings_section(
-            'mellon_section_id', // ID
-            'Mellon Information', // Name
-            array($this, 'print_mellon_info'), // Callback
-            'mellon-auth-setting-admin' // Page
-        );
-
-        add_settings_field(
-            'create_new_user', // ID
-            'Create new user upon initial login?', // Name 
-            array($this, 'create_new_user_callback'), // Callback
-            'mellon-auth-setting-admin', // Page
-            'setting_section_id' // Section           
-        );
-
-        add_settings_field(
-            'domain_names', //ID
-            'Allowed Domain Names (comma separated list - or leave blank to allow all SSO domains)', // Name 
-            array($this, 'domain_names_callback'), // Callback
-            'mellon-auth-setting-admin', // Page
-            'setting_section_id' // Section
-        );
-
-        add_settings_field(
-            'redirect_location', //ID
-            'Redirect to:', // Name 
-            array($this, 'redirect_location_callback'), // Callback
-            'mellon-auth-setting-admin', // Page
-            'setting_section_id', // Section
-        );
+        add_settings_field('create_new_user', 'Create new user?', array($this, 'create_new_user_callback'), 'mellon-auth-setting-admin', 'setting_section_id');
+        add_settings_field('domain_names', 'Allowed Domains (comma separated)', array($this, 'domain_names_callback'), 'mellon-auth-setting-admin', 'setting_section_id');
+        add_settings_field('redirect_location', 'Redirect to:', array($this, 'redirect_location_callback'), 'mellon-auth-setting-admin', 'setting_section_id');
     }
 
-    // Sanitize each setting field as needed
-    //
-    // @param array $input Contains all settings fields as array keys
-    public function sanitize($input)
-    {
+    public function sanitize($input) {
         $new_input = array();
-        if (isset($input['create_new_user']))
-            $new_input['create_new_user'] = $input['create_new_user'];
-
-        if (isset($input['domain_names']))
-            $new_input['domain_names'] = sanitize_text_field($input['domain_names']);
-
-        if (isset($input['redirect_location']))
-            $new_input['redirect_location'] = $input['redirect_location'];
+        $new_input['create_new_user'] = isset($input['create_new_user']) ? 1 : 0;
+        $new_input['domain_names'] = sanitize_text_field($input['domain_names'] ?? '');
+        
+        $redirect = $input['redirect_location'] ?? 'site';
+        $new_input['redirect_location'] = in_array($redirect, ['site', 'admin']) ? $redirect : 'site';
 
         return $new_input;
     }
 
-    public function print_mellon_info()
-    {
-        print "<div style='border-top: 2px solid black;padding-bottom:20px;'><b>Mellon Variables:</b></div>";
-        //spit out the MELLON variable for fun and profit!
+    public function print_mellon_info() {
+        echo "<div style='border-top: 1px solid #ccc; padding-top:10px;'><strong>Detected Mellon Variables:</strong></div>";
         foreach ($_SERVER as $key => $value) {
-            if (substr($key, 0, 7) == 'MELLON_') {
-                print "<div><span>" . $key . '</span><span style="padding-left:20px;padding-right:20px;"> = </span><span>' . $value . "</span></div>";
+            if (strpos($key, 'MELLON_') === 0) {
+                printf('<div><code>%s</code> = <code>%s</code></div>', esc_html($key), esc_html($value));
             }
         }
-        print "<div style='border-top: 2px solid black;padding-bottom:20px;'><div style='text-align:right;'><i>Mellon-Auth Plugin cobbled together by Rob Laltrello - 2024</i></div></div>";
-
     }
 
-    public function print_section_info()
-    {
-        print 'Only authenicated users with an email address domain listed in the \'Allowed Domain Names\' list below will be allowed into the site. (e.g highlands.edu)';
+    public function print_section_info() {
+        echo 'Configure how your mod_auth_mellon environment variables map to WordPress users.';
     }
 
-    public function create_new_user_callback()
-    {
-        echo '<input type="checkbox" id="create_new_user" name="mellon_auth_option_name[create_new_user]" value="1"' . checked(1, @$this->options['create_new_user'], false) . '/>';
+    public function create_new_user_callback() {
+        $val = $this->options['create_new_user'] ?? 0;
+        printf('<input type="checkbox" name="mellon_auth_option_name[create_new_user]" value="1" %s />', checked(1, $val, false));
     }
 
-    public function domain_names_callback()
-    {
-        printf(
-            '<input type="text" id="domain_names" name="mellon_auth_option_name[domain_names]" value="%s" />',
-            isset($this->options['domain_names']) ? esc_attr($this->options['domain_names']) : ''
-        );
+    public function domain_names_callback() {
+        $val = $this->options['domain_names'] ?? '';
+        printf('<input type="text" class="regular-text" name="mellon_auth_option_name[domain_names]" value="%s" />', esc_attr($val));
     }
 
-    public function redirect_location_callback()
-    {
-	    echo '<input type="radio" id="redirect_location" name="mellon_auth_option_name[redirect_location]" value="site"' . checked("site", @$this->options['redirect_location'], false) . '/><label for="site">Site URL</label><br/>';
-	    echo '<input type="radio" id="redirect_location" name="mellon_auth_option_name[redirect_location]" value="admin"' . checked("admin", @$this->options['redirect_location'], false) . '/><label for="admin">User Admin URL</label>';
-
+    public function redirect_location_callback() {
+        $val = $this->options['redirect_location'] ?? 'site';
+        echo '<label><input type="radio" name="mellon_auth_option_name[redirect_location]" value="site"' . checked("site", $val, false) . '/> Homepage</label><br/>';
+        echo '<label><input type="radio" name="mellon_auth_option_name[redirect_location]" value="admin"' . checked("admin", $val, false) . '/> Admin Dashboard</label>';
     }
-
 }
 
-if (is_admin())
-    $mellon_auth_settings_page = new MellonAuthSettingsPage();
-?>
+if (is_admin()) {
+    new MellonAuthSettingsPage();
+}
