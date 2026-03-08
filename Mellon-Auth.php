@@ -13,111 +13,100 @@ Domain Path:  /languages
 */
 
 
+<?php
+/*
+Plugin Name:  Mellon-Auth
+... (headers remain the same)
+*/
+
 require_once 'Mellon-Auth-Settings.php';
 
+class MellonAuth {
 
-class MellonAuth
-{
+    public function __construct() {
+        // Use the authenticate filter instead of wp_loaded
+        // Priority 10, 3 arguments ($user, $username, $password)
+        add_filter('authenticate', array($this, 'mellon_authenticate'), 10, 3);
+    }
 
-    public function on_loaded()
-    {
-
-        $username = @$_SERVER['MELLON_email'];
-
-        $alloweddomaincheck = false;  //initially assume domain is not allowed
-
-        $mellon_auth_options = get_option('mellon_auth_option_name'); // get array from settings page
-
-        $createuser = $mellon_auth_options['create_new_user'] ?? null; // checkbox makes this variable "disappear" 
-        // so handle it with fancy null coalescing operator
-
-        $alloweddomains = $mellon_auth_options['domain_names'] ?? null;  // comma separated list of allowed domain names
-	$redirectlocation = $mellon_auth_options['redirect_location'] ?? null; //where to land the authenticated user
-
-        $domainarray = explode(',', $alloweddomains);  // split them into array
-
-        $tmp = explode('@', $username);  // grab domain of authenticated mellon user's email address
-        $userdomain = end($tmp);         //
-
-        if (!isset($alloweddomains) || empty($alloweddomains)) { // no domain restrictions
-            $alloweddomaincheck = true;  // allow them in
-        } else { //lower case the allowed domains and check them against the user's domain
-            $lowerdomainarray = array_map('strtolower', $domainarray); // lowercase array
-            $alloweddomaincheck = in_array(strtolower($userdomain), $lowerdomainarray);
+    public function mellon_authenticate($user, $username, $password) {
+        // 1. If we are already logged in or Mellon variables are missing, bail.
+        if (empty($_SERVER['MELLON_email'])) {
+            return $user; 
         }
 
-        //$usercheck = get_userdata( $username );
+        // 2. Fetch Settings
+        $options = get_option('mellon_auth_option_name');
+        $create_enabled = $options['create_new_user'] ?? false;
+        $allowed_domains_raw = $options['domain_names'] ?? '';
+        $redirect_pref = $options['redirect_location'] ?? 'site';
 
-        //grab the wordpress user (if it exists)
-        $user = get_user_by('login', $username);
+        // 3. Sanitize and Validate User Info from Mellon
+        $mellon_email = sanitize_email($_SERVER['MELLON_email']);
+        $mellon_fname = sanitize_text_field($_SERVER['MELLON_fname'] ?? '');
+        $mellon_lname = sanitize_text_field($_SERVER['MELLON_lname'] ?? '');
 
-        if (is_login()) {  // check if we are on a worpress login page
+        // 4. Domain Whitelist Check
+        $tmp = explode('@', $mellon_email);
+        $user_domain = strtolower(end($tmp));
+        $is_allowed = false;
 
-            if ($createuser && !$user && $alloweddomaincheck) { //wordpress user doesn't exist, create it if allowed domain
-                $user_id = wp_insert_user(
-                    array(
-                        'user_login' => @$_SERVER['MELLON_email'],
-                        'user_email' => @$_SERVER['MELLON_email'],
-                        'first_name' => @$_SERVER['MELLON_fname'],
-                        'last_name' => @$_SERVER['MELLON_lname'],
-                        'display_name' => @$_SERVER['MELLON_fname'] . " " . @$_SERVER['MELLON_lname'],
-                        'role' => 'subscriber'
-                    )
-                );
-
-                if ( is_multisite() ) {  // if it is a multisite, add them to the sites as subscriber
-                    $sites = get_sites( [
-                        'limit' => 0,
-                        'public' => true,
-                        'spam' => false,
-                        'deleted' => false,
-                        'archived' => false,
-                        'mature' => false,
-                     ] );
-                
-                     foreach ( $sites as $site ) {
-                         $site_id = get_object_vars( $site )['blog_id'];
-                         $add_user = add_user_to_blog( $site_id, $user_id, 'subscriber' );
-                     }
-                
-                }
-
-                $user = get_user_by('id', $user_id);
-            }
-
-	    if ($redirectlocation === "admin") {
-                  $redirect_to= user_admin_url();
-	    } else { //default
-		  $redirect_to=site_url();
-	    }
-
-            if (!is_wp_error($user) && $user && $alloweddomaincheck) { // user exist and domain is allowed
-
-                //log them into wp
-                wp_clear_auth_cookie();
-                wp_set_current_user($user->ID, $user->user_login);
-                wp_set_auth_cookie($user->ID, TRUE);
-                update_user_caches($user);
-
-                // check to make sure they are logged in
-                if (is_user_logged_in()) {
-                    //user is logged in, send them to the appropriate admin page
-                    wp_safe_redirect($redirect_to);
-                    exit;
-                }
-
-            } else {  //explain to the user what could have happened
-                echo ("<h1>You are seeing this local login because your SSO account was not found</h1>");
-                echo ("<h1>or your domain ($userdomain) is not authorized to use SSO for this site.</h1>");
+        if (empty($allowed_domains_raw)) {
+            $is_allowed = true; // Fail-open per your original design
+        } else {
+            // Trim whitespace and lowercase for strict comparison
+            $domain_array = array_map('trim', explode(',', strtolower($allowed_domains_raw)));
+            if (in_array($user_domain, $domain_array)) {
+                $is_allowed = true;
             }
         }
 
+        if (!$is_allowed) {
+            return new WP_Error('denied_domain', "<strong>SSO Error</strong>: Your domain ($user_domain) is not authorized.");
+        }
+
+        // 5. Look for existing user
+        $wp_user = get_user_by('email', $mellon_email);
+
+        // 6. Create user if they don't exist
+        if (!$wp_user && $create_enabled) {
+            $user_id = wp_insert_user(array(
+                'user_login'   => $mellon_email, // Using email as login for consistency
+                'user_email'   => $mellon_email,
+                'first_name'   => $mellon_fname,
+                'last_name'    => $mellon_lname,
+                'display_name' => trim("$mellon_fname $mellon_lname"),
+                'role'         => 'subscriber',
+                'user_pass'    => wp_generate_password() // Random pass for SSO users
+            ));
+
+            if (is_wp_error($user_id)) {
+                return $user_id;
+            }
+
+            // Multisite: Only add to current blog to prevent timeouts on large networks
+            if (is_multisite()) {
+                add_user_to_blog(get_current_blog_id(), $user_id, 'subscriber');
+            }
+
+            $wp_user = get_user_by('id', $user_id);
+        }
+
+        // 7. Final Check & Redirect
+        if ($wp_user) {
+            // Set the cookies manually since we are bypassing the password form
+            wp_set_auth_cookie($wp_user->ID, true);
+            
+            $redirect_to = ($redirect_pref === 'admin') ? admin_url() : home_url();
+            wp_safe_redirect($redirect_to);
+            exit;
+        }
+
+        return $user;
     }
 }
 
-
-$my_mellonauth = new MellonAuth();
-add_action('wp_loaded', array($my_mellonauth, 'on_loaded'));
+new MellonAuth();
 
 
 ?>
